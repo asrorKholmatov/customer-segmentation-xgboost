@@ -1,0 +1,22 @@
+__pycache__/
+*.pyc
+.env
+venv/
+.venv/
+.ipynb_checkpoints/
+.DS_Store
+.claude/
+.netlify/
+
+# raw data is downloaded by src/dataset.py
+data/
+
+# keep the trained model so the API works out of the box
+models/*
+!models/xgb_model.json
+*.pkl
+
+# empty leftovers
+.gitignore\ 
+requirments.py
+.dockerignore

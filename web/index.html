@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SegmentIQ — Customer Segmentation</title>
+  <meta name="description" content="Classify customers into marketing segments A–D with an XGBoost model that runs entirely in your browser.">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%234f46e5'/><circle cx='11' cy='12' r='4' fill='white'/><circle cx='21' cy='12' r='4' fill='%23a5b4fc'/><circle cx='16' cy='21' r='4' fill='%23c7d2fe'/></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="nav">
+    <div class="wrap nav-inner">
+      <a href="#" class="brand"><span class="logo"></span>SegmentIQ</a>
+      <nav>
+        <a href="#predict">Classify</a>
+        <a href="#batch">Batch</a>
+        <a href="#segments">Segments</a>
+        <a href="#model">Model</a>
+        <a href="https://github.com/" id="gh-link" class="btn btn-ghost btn-sm" target="_blank" rel="noopener">GitHub</a>
+      </nav>
+    </div>
+  </header>
+
+  <section class="hero">
+    <div class="wrap">
+      <span class="eyebrow">XGBoost · runs 100% in your browser</span>
+      <h1>Know which segment<br>a customer belongs to.</h1>
+      <p class="lead">Enter a customer's profile — or upload a whole CSV — and SegmentIQ predicts their marketing segment (A, B, C or D), how confident it is, and how to approach them. No data leaves your device.</p>
+      <div class="hero-cta">
+        <a href="#predict" class="btn btn-primary">Classify a customer</a>
+        <a href="#batch" class="btn btn-ghost">Upload a CSV</a>
+      </div>
+      <div class="stats" id="hero-stats"></div>
+    </div>
+  </section>
+
+  <section id="predict" class="section">
+    <div class="wrap">
+      <div class="section-head">
+        <h2>Classify a single customer</h2>
+        <p>Leave a field as “Unknown” if you don't have it — the model was trained to handle missing values.</p>
+      </div>
+      <div class="grid-2">
+        <form id="form" class="card form">
+          <label>Gender
+            <select name="Gender"><option>Male</option><option>Female</option></select>
+          </label>
+          <label>Age <output id="age-out">35</output>
+            <input type="range" name="Age" min="18" max="89" value="35">
+          </label>
+          <label>Ever married
+            <select name="Ever_Married"><option>Yes</option><option>No</option><option value="">Unknown</option></select>
+          </label>
+          <label>Graduated
+            <select name="Graduated"><option>Yes</option><option>No</option><option value="">Unknown</option></select>
+          </label>
+          <label>Profession
+            <select name="Profession" id="profession"></select>
+          </label>
+          <label>Spending score
+            <select name="Spending_Score"><option>Low</option><option selected>Average</option><option>High</option></select>
+          </label>
+          <label>Work experience (years)
+            <input type="number" name="Work_Experience" min="0" max="40" placeholder="Unknown" value="2">
+          </label>
+          <label>Family size
+            <input type="number" name="Family_Size" min="1" max="15" placeholder="Unknown" value="3">
+          </label>
+          <label class="span-2">Customer category (Var_1)
+            <select name="Var_1" id="category"></select>
+          </label>
+          <div class="span-2 form-actions">
+            <button type="button" class="btn btn-ghost btn-sm" id="randomize">Try a random customer</button>
+          </div>
+        </form>
+
+        <div class="card result" id="result" aria-live="polite">
+          <div class="result-top">
+            <div class="badge" id="r-badge">–</div>
+            <div>
+              <div class="muted small">Predicted segment</div>
+              <div class="r-title" id="r-title">–</div>
+              <div class="muted" id="r-conf"></div>
+            </div>
+          </div>
+          <div class="probs" id="r-probs"></div>
+          <div class="advice">
+            <h4>Recommended approach</h4>
+            <ul id="r-advice"></ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="batch" class="section alt">
+    <div class="wrap">
+      <div class="section-head">
+        <h2>Classify a whole customer list</h2>
+        <p>Upload a CSV with the columns <code>Gender, Ever_Married, Age, Graduated, Profession, Work_Experience, Spending_Score, Family_Size, Var_1</code>. Extra columns (like an ID) are kept in the output.</p>
+      </div>
+      <div class="card">
+        <label class="drop" id="drop">
+          <input type="file" id="file" accept=".csv,text/csv" hidden>
+          <strong>Drop a CSV here</strong> or click to choose a file
+          <span class="muted small">Processed locally — nothing is uploaded to a server.</span>
+        </label>
+        <div class="batch-actions">
+          <a class="btn btn-ghost btn-sm" href="sample_customers.csv" download>Download sample CSV</a>
+          <button class="btn btn-ghost btn-sm" id="use-sample">Run on sample data</button>
+          <button class="btn btn-primary btn-sm" id="download" disabled>Download results</button>
+        </div>
+        <div id="batch-out" hidden>
+          <div class="dist" id="dist"></div>
+          <div class="table-wrap"><table id="table"></table></div>
+          <p class="muted small" id="batch-note"></p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="segments" class="section">
+    <div class="wrap">
+      <div class="section-head">
+        <h2>Meet the four segments</h2>
+        <p>Profiles computed from 8,068 real customers in the training data.</p>
+      </div>
+      <div class="seg-grid" id="seg-grid"></div>
+    </div>
+  </section>
+
+  <section id="model" class="section alt">
+    <div class="wrap">
+      <div class="section-head">
+        <h2>How good is the model?</h2>
+        <p>Evaluated on a held-out 20% test set the model never saw during training.</p>
+      </div>
+      <div class="kpis" id="kpis"></div>
+      <div class="grid-2">
+        <div class="card">
+          <h3>Confusion matrix</h3>
+          <p class="muted small">Rows = true segment, columns = predicted. Darker diagonal = more correct.</p>
+          <div id="confusion" class="confusion"></div>
+        </div>
+        <div class="card">
+          <h3>What drives the prediction</h3>
+          <p class="muted small">Share of total XGBoost gain per feature.</p>
+          <div id="importance" class="bars"></div>
+        </div>
+      </div>
+      <div class="card note">
+        <h3>Reading these numbers honestly</h3>
+        <p>Segments in this dataset overlap a lot — two customers with identical profiles often sit in different segments — so no model gets near 100%. Published solutions for this Kaggle dataset top out around 50–55% accuracy. SegmentIQ is about <strong>2× better than guessing</strong>, and is most reliable for segment D (young, single, low spenders). Use the confidence score: predictions above ~60% are noticeably more trustworthy.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="wrap">
+      <div class="section-head"><h2>How it works</h2></div>
+      <ol class="steps">
+        <li><span>1</span><div><h4>Data</h4><p>Kaggle “Customer Segmentation” dataset — 8,068 customers of an automobile company with segments assigned by the sales team.</p></div></li>
+        <li><span>2</span><div><h4>Features</h4><p>Yes/No fields become 0/1, spending becomes Low &lt; Average &lt; High, profession and category are one-hot encoded. Missing values stay missing.</p></div></li>
+        <li><span>3</span><div><h4>Training</h4><p>XGBoost multi-class classifier; depth, learning rate and leaf size tuned with 5-fold cross-validation, tree count by early stopping.</p></div></li>
+        <li><span>4</span><div><h4>In your browser</h4><p>The trained trees are exported to JSON and evaluated in JavaScript — identical results to Python, no server needed.</p></div></li>
+      </ol>
+    </div>
+  </section>
+
+  <footer class="footer">
+    <div class="wrap">
+      <span>SegmentIQ · XGBoost customer segmentation</span>
+      <span>Data: <a href="https://www.kaggle.com/datasets/vetrirah/customer" target="_blank" rel="noopener">Kaggle — vetrirah/customer</a></span>
+    </div>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
